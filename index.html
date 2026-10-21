@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guardia Materna 3D | Simulador de Obstetricia</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f7edf0;
+        }
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            z-index: 10;
+        }
+        .hud-panel {
+            background: rgba(255, 250, 249, 0.95);
+            backdrop-filter: blur(8px);
+            padding: 12px 24px;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            pointer-events: auto;
+            border: 2px solid rgba(128, 31, 65, 0.18);
+        }
+        .top-hud {
+            align-self: center;
+            flex-direction: column;
+            text-align: center;
+            max-width: 750px;
+            width: 100%;
+        }
+        .stats-container {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-weight: bold;
+            color: #1e293b;
+            font-size: 1.1rem;
+            margin-bottom: 6px;
+        }
+        #question-text {
+            font-size: 1.2rem;
+            color: #641b36;
+            font-weight: 800;
+        }
+        .stat-badge {
+            background: #f4e2e8;
+            padding: 4px 12px;
+            border-radius: 8px;
+            color: #6d2742;
+        }
+        .hearts {
+            color: #ef4444;
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+        .screen-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(43,13,30,.88), rgba(91,26,53,.83));
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            pointer-events: auto;
+            transition: opacity 0.3s ease;
+        }
+        .card {
+            background: #ffffff;
+            padding: 40px;
+            border-radius: 24px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+            text-align: center;
+            max-width: 520px;
+            width: 90%;
+            border: 4px solid #e7c4a0;
+        }
+        .card h1 {
+            color: #7a2345;
+            font-size: 2.2rem;
+            margin-bottom: 12px;
+            font-weight: 900;
+        }
+        .motivational-quote {
+            font-style: italic;
+            color: #7a2345;
+            font-size: 1.1rem;
+            background: #fbf0f2;
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c79a4b;
+        }
+        .card p {
+            color: #475569;
+            font-size: 1.05rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .btn {
+            background: linear-gradient(135deg, #8b2d50, #5d1936);
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 14px;
+            cursor: pointer;
+            box-shadow: 0 6px 20px rgba(105, 26, 58, 0.35);
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(105, 26, 58, 0.45);
+        }
+        .hidden {
+            display: none !important;
+        }
+        .controls-hint {
+            align-self: center;
+            background: rgba(62, 20, 40, 0.88);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .brand-chip{font-size:.75rem;letter-spacing:.16em;text-transform:uppercase;color:#c79a4b;font-weight:900;margin-bottom:8px}
+        .mobile-controls{position:absolute;bottom:64px;left:50%;transform:translateX(-50%);display:flex;gap:12px;z-index:12;pointer-events:auto}
+        .mobile-controls button{width:52px;height:48px;border:1px solid rgba(255,255,255,.7);border-radius:15px;background:rgba(91,26,53,.92);color:white;font-size:1.3rem;font-weight:900;box-shadow:0 5px 14px #30102055}
+        .mobile-controls button:active{transform:scale(.95);background:#b47a42}
+        @media(max-width:700px){#ui-layer{padding:10px}.hud-panel{padding:9px 11px;border-radius:13px}.stats-container{font-size:.82rem;gap:4px}.stat-badge{padding:4px 6px}#question-text{font-size:1rem}.controls-hint{font-size:.72rem;padding:7px 10px;max-width:96%}.card{padding:25px 20px}.card h1{font-size:1.7rem}.card p{font-size:.95rem}.mobile-controls{bottom:58px}}
+    </style>
+    <!-- Three.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-layer">
+        <div class="hud-panel top-hud">
+            <div class="stats-container">
+                <span class="stat-badge">🏥 Guardia <span id="level-val">1</span>/6</span>
+                <span class="stat-badge">Puntuación: <span id="score-val">0</span> pts</span>
+                <span class="stat-badge">Vidas: <span id="lives-val" class="hearts">❤️❤️❤️</span></span>
+            </div>
+            <div id="question-text">Reto clínico: selecciona la respuesta correcta</div>
+        </div>
+        <div class="controls-hint">
+            Usa <b>← →</b> o <b>A / D</b> para elegir una estación | Presiona <b>↑ / Espacio</b> o el botón de acción para responder.
+        </div>
+    </div>
+
+    <div class="mobile-controls" aria-label="Controles del juego">
+      <button onclick="moveLane(-1)" aria-label="Mover a la izquierda">◀</button>
+      <button onclick="jumpNow()" aria-label="Confirmar respuesta">✓</button>
+      <button onclick="moveLane(1)" aria-label="Mover a la derecha">▶</button>
+    </div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="screen-overlay">
+        <div class="card">
+            <div class="brand-chip">Simulador académico · Obstetricia</div><h1>🏥 Guardia Materna 3D</h1>
+            <div class="motivational-quote">"Cada decisión clínica te acerca a una atención materna segura."</div>
+            <p>Recorre una unidad materno-perinatal, identifica la estación correcta y supera retos de <b>Obstetricia, embarazo, atención prenatal y anatomía</b>.<br><br>Conserva tus <b>3 oportunidades</b>. Cada respuesta correcta suma <b>5 puntos</b>.</p>
+            <button class="btn" onclick="startGame()">Iniciar turno clínico</button>
+        </div>
+    </div>
+
+    <!-- Level Complete Modal -->
+    <div id="level-screen" class="screen-overlay hidden">
+        <div class="card">
+            <h1 id="level-title">¡Nivel Superado!</h1>
+            <p id="level-msg">¡Buen comienzo!</p>
+            <button class="btn" onclick="nextLevel()">Siguiente Nivel</button>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="gameover-screen" class="screen-overlay hidden">
+        <div class="card">
+            <h1>¡Juego Terminado!</h1>
+            <p>Se agotaron tus oportunidades en esta guardia. Repasa los conceptos y vuelve a intentarlo.</p>
+            <p style="font-size: 1.3rem; font-weight: bold; color: #1e293b; margin-top: -10px; margin-bottom: 20px;">Puntuación Final: <span id="final-score">0</span> pts</p>
+            <button class="btn" onclick="restartGame()">Jugar de Nuevo</button>
+        </div>
+    </div>
+
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="screen-overlay hidden">
+        <div class="card">
+            <h1>🏆 ¡Felicidades!</h1>
+            <p>¡Guardia completada! Has superado los retos de la unidad materno-perinatal.</p>
+            <p style="font-size: 1.3rem; font-weight: bold; color: #1e293b; margin-top: -10px; margin-bottom: 20px;">Puntuación Total: <span id="victory-score">0</span> pts</p>
+            <button class="btn" onclick="restartGame()">Jugar Otra Vez</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 60 PREGUNTAS DISTRIBUIDAS EN 6 NIVELES ---
+        const levelsData = [
+            {
+                name: "Nivel 1 — Admisión y fundamentos",
+                msg: "¡Buen comienzo!",
+                questions: [
+                    { q: "¿Qué es la Obstetricia?", options: ["Ciencia que estudia\nel embarazo, parto y puerperio", "Estudio exclusivo\ndel neonato"], correct: 0 },
+                    { q: "¿Qué profesional atiende el embarazo y parto dentro de sus competencias?", options: ["El obstetra", "El cirujano\ngeneral"], correct: 0 },
+                    { q: "¿Cuándo se creó el Colegio de Obstetrices del Perú?", options: ["1975", "1981"], correct: 0 },
+                    { q: "¿Qué norma creó el Colegio de Obstetrices del Perú?", options: ["Decreto Ley\nN.° 21210", "Ley N.° 23346"], correct: 0 },
+                    { q: "¿Cuándo se reconoció la Obstetricia como profesión médica en el Perú?", options: ["1981", "1975"], correct: 0 },
+                    { q: "¿Qué ley reconoció a la Obstetricia como profesión médica?", options: ["Ley N.° 23346", "Decreto Ley 21210"], correct: 0 },
+                    { q: "¿Cuándo se promulgó la Ley de Trabajo de la Obstetriz?", options: ["2002", "1981"], correct: 0 },
+                    { q: "¿Qué ley regula el trabajo del profesional obstetra?", options: ["Ley N.° 27853", "Ley N.° 23346"], correct: 0 },
+                    { q: "¿Cómo se llama actualmente el colegio profesional?", options: ["Colegio de\nObstetras del Perú", "Colegio de\nObstetrices"], correct: 0 },
+                    { q: "¿En qué año se creó el Himno del Colegio de Obstetras del Perú?", options: ["2005", "2002"], correct: 0 }
+                ]
+            },
+            {
+                name: "Nivel 2 — Embarazo y desarrollo fetal",
+                msg: "¡La ranita está aprendiendo!",
+                questions: [
+                    { q: "¿Qué resolución estableció originalmente el Himno del Colegio?", options: ["Resolución N.°\n017-2005-CN-COP", "Resolución N.°\n100-2017", "Resolución N.°\n050-2002"], correct: 0 },
+                    { q: "¿En qué año se creó una nueva estrofa del Himno?", options: ["2017", "2005", "2002"], correct: 0 },
+                    { q: "¿Quién fue Madame du Coudray?", options: ["Partera francesa\ndel siglo XVIII", "Médica obstetra\nperuana", "Científica de\nla genética"], correct: 0 },
+                    { q: "¿En qué país destacó Madame du Coudray?", options: ["Francia", "Inglaterra", "España"], correct: 0 },
+                    { q: "¿Cuánto dura aproximadamente un embarazo?", options: ["40 semanas", "36 semanas", "42 semanas"], correct: 0 },
+                    { q: "¿Dónde se implanta normalmente el blastocisto?", options: ["Endometrio uterino", "Trompa de Falopio", "Ovario derecho"], correct: 0 },
+                    { q: "¿Qué órgano nutre al feto durante el embarazo?", options: ["Placenta", "Cordón umbilical", "Saco vitelino"], correct: 0 },
+                    { q: "¿Cuál es la función principal de la placenta?", options: ["Intercambio\nmaterno-fetal", "Producción de\nleche materna", "Protección\nósea fetal"], correct: 0 },
+                    { q: "¿Cuál es la presentación fetal más frecuente?", options: ["Cefálica", "Podálica", "Transversa"], correct: 0 },
+                    { q: "¿Qué hormona detectan las pruebas de embarazo?", options: ["hCG (Gonadotropina\ncoriónica humana)", "Progesterona\nsistémica", "Oxitocina\npura"], correct: 0 }
+                ]
+            },
+            {
+                name: "Nivel 3 — Atención prenatal",
+                msg: "¡Excelente salto!",
+                questions: [
+                    { q: "¿Qué significa FUM?", options: ["Fecha de última\nmenstruación", "Frecuencia\nuterina materna", "Formación uterina\nmedida"], correct: 0 },
+                    { q: "¿Qué significa FPP?", options: ["Fecha probable\nde parto", "Feto por\nparto", "Flujo placentario\nprimario"], correct: 0 },
+                    { q: "¿Qué significa EG?", options: ["Edad gestacional", "Embarazo\ngenerado", "Examen\nginecológico"], correct: 0 },
+                    { q: "¿Qué vitamina ayuda a prevenir defectos del tubo neural?", options: ["Ácido fólico", "Vitamina C", "Vitamina D3"], correct: 0 },
+                    { q: "¿Qué mineral se suplementa para prevenir la anemia?", options: ["Hierro", "Calcio", "Magnesio"], correct: 0 },
+                    { q: "¿Cuándo debe iniciarse el control prenatal?", options: ["Lo antes posible", "En el tercer\ntrimestre", "A las 28 semanas"], correct: 0 },
+                    { q: "¿Cuántas atenciones prenatales como mínimo recomienda el MINSA?", options: ["6 atenciones", "4 atenciones", "8 atenciones"], correct: 0 },
+                    { q: "¿Antes de qué semana debe realizarse el primer control prenatal?", options: ["Antes de\nlas 14 semanas", "Antes de\nlas 20 semanas", "Antes de\nlas 10 semanas"], correct: 0 },
+                    { q: "¿Cada cuánto se realizan los controles al inicio del embarazo?", options: ["Cada 4 semanas", "Cada 2 semanas", "Cada mes y medio"], correct: 0 },
+                    { q: "¿Desde qué semana pueden realizarse controles semanales?", options: ["Desde la\nsemana 36", "Desde la\nsem 32", "Desde la\nsem 40"], correct: 0 }
+                ]
+            },
+            {
+                name: "Nivel 4 — Sala de partos",
+                msg: "¡Ya eres experta!",
+                questions: [
+                    { q: "¿Qué se controla principalmente durante la atención prenatal?", options: ["Madre y feto", "Solo la madre", "Solo el peso\nfetal", "Presión arterial"], correct: 0 },
+                    { q: "¿Qué signo vital es fundamental controlar en la gestante?", options: ["Presión arterial", "Temperatura\ncorporal", "Frecuencia\nrespiratoria", "Pulso fetal"], correct: 0 },
+                    { q: "¿Qué enfermedad se relaciona con hipertensión y proteinuria?", options: ["Preeclampsia", "Diabetes\ngestacional", "Placenta previa", "Eclampsia leve"], correct: 0 },
+                    { q: "¿Para qué sirven los controles prenatales?", options: ["Detectar\ncomplicaciones", "Acelerar\nel parto", "Inducir\nla lactancia", "Nutrición fetal"], correct: 0 },
+                    { q: "¿Cuál es la primera etapa del trabajo de parto?", options: ["Dilatación", "Expulsión", "Alumbramiento", "Monitoreo"], correct: 0 },
+                    { q: "¿Qué instrumento registra la evolución del trabajo de parto?", options: ["Partograma", "Ecógrafo\ndigital", "Monitor fetal\ncardíaco", "Estetoscopio"], correct: 0 },
+                    { q: "¿Qué maniobras evalúan la situación y presentación fetal?", options: ["Maniobras\nde Leopold", "Maniobras\nde Credé", "Maniobras\nde Valsalva", "Maniobras físicas"], correct: 0 },
+                    { q: "¿Cuál es el orden de las maniobras de Leopold?", options: ["Situación, posición,\npresentación y encajamiento", "Presentación, posición,\nsituación y altura", "Encajamiento, posición,\nsituación y feto", "Orden aleatorio"], correct: 0 },
+                    { q: "¿Qué es el puerperio?", options: ["Periodo posterior\nal parto", "Etapa previa\nal embarazo", "Fase inicial\nde dilatación", "Maduración"], correct: 0 },
+                    { q: "¿Qué significa RN?", options: ["Recién nacido", "Respiración\nneonatal", "Ritmo normal", "Reflejo natural"], correct: 0 }
+                ]
+            },
+            {
+                name: "Nivel 5 — Salud sexual y reproductiva",
+                msg: "¡Maravilloso avance hacia el loto dorado!",
+                questions: [
+                    { q: "¿Qué es la lactancia materna exclusiva?", options: ["Solo leche materna", "Leche más agua", "Leche más fórmula", "Lactancia mixta"], correct: 0 },
+                    { q: "¿Cuánto dura la lactancia materna exclusiva recomendada?", options: ["6 meses", "3 meses", "1 año", "9 meses"], correct: 0 },
+                    { q: "¿Qué estudia la anatomía?", options: ["La estructura\ndel cuerpo", "El funcionamiento\ndel cuerpo", "Las patologías", "La célula viva"], correct: 0 },
+                    { q: "¿Qué estudia la fisiología?", options: ["El funcionamiento\ndel cuerpo", "La estructura\ncelular", "La anatomía\ngeneral", "Los tejidos"], correct: 0 },
+                    { q: "¿Cuál es el órgano reproductor femenino donde se desarrolla el embarazo?", options: ["Útero", "Ovario", "Vagina", "Trompa"], correct: 0 },
+                    { q: "¿Dónde ocurre normalmente la fecundación?", options: ["Trompa uterina\n(trompa de Falopio)", "Cavidad\nendometrial", "Cuello uterino", "Ovario"], correct: 0 },
+                    { q: "¿Qué gameto aporta la mujer?", options: ["Óvulo", "Espermatozoide", "Cigoto", "Embrión"], correct: 0 },
+                    { q: "¿Qué gameto aporta el varón?", options: ["Espermatozoide", "Óvulo", "Próstata", "Célula madre"], correct: 0 },
+                    { q: "¿Cómo se llama la unión del óvulo y espermatozoide?", options: ["Fecundación", "Ovulación", "Implantación", "Mitosis"], correct: 0 },
+                    { q: "¿Cómo se llama la primera célula formada después de la fecundación?", options: ["Cigoto", "Blastocisto", "Mórula", "Gástrula"], correct: 0 }
+                ]
+            },
+            {
+                name: "Nivel 6 — Guardia de alta complejidad",
+                msg: "¡Desafío final superado con éxito!",
+                questions: [
+                    { q: "¿Qué estructura se implanta en el endometrio?", options: ["Blastocisto", "Cigoto simple", "Óvulo maduro", "Mórula temprana", "Feto activo"], correct: 0 },
+                    { q: "¿Qué hormona mantiene inicialmente el embarazo?", options: ["Progesterona", "Estrógeno libre", "Prolactina alta", "Oxitocina", "Insulina"], correct: 0 },
+                    { q: "¿Qué hormona desencadena principalmente la ovulación?", options: ["LH (Luteinizante)", "FSH (Folículo)", "Oxitocina", "Progesterona", "Prolactina"], correct: 0 },
+                    { q: "¿Qué hormona estimula el crecimiento folicular?", options: ["FSH", "LH", "Progesterona", "Estrógeno", "HCG"], correct: 0 },
+                    { q: "¿Qué hormona estimula las contracciones uterinas?", options: ["Oxitocina", "Prolactina", "Insulina", "Cortisol", "Tiroxina"], correct: 0 },
+                    { q: "¿Qué hormona estimula la producción de leche?", options: ["Prolactina", "Oxitocina", "Estrógeno", "Progesterona", "Andrógeno"], correct: 0 },
+                    { q: "¿Qué significa APN?", options: ["Atención prenatal", "Acción placentaria\nnormal", "Altura pelviana\nneonatal", "Análisis postnatal", "Asistencia percutánea"], correct: 0 },
+                    { q: "¿Qué significa MAC?", options: ["Método\nanticonceptivo", "Madre con\ncontrol", "Maternidad activa\ncompleta", "Monitoreo avanzado", "Medicina clínica"], correct: 0 },
+                    { q: "¿Qué significa ITS?", options: ["Infección de\ntransmisión sexual", "Inmunidad total\nsistémica", "Inflamación del\ntracto superior", "Índice de salud", "Infección tisular"], correct: 0 },
+                    { q: "¿Qué significa VIH?", options: ["Virus de la\ninmunodeficiencia humana", "Vía inmunológica\nhumana", "Vacuna infecciosa\nhepática", "Virus inmune", "Vaso hepático"], correct: 0 }
+                ]
+            }
+        ];
+
+        let currentLevelIndex = 0;
+        let currentQInLevel = 0;
+        let score = 0;
+        let lives = 3;
+        let gameActive = false;
+
+        // --- THREE.JS SETUP ---
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4e8ec);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 12, 17);
+        camera.lookAt(0, 1.3, -3);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xfff2f4, 1.25);
+        scene.add(ambientLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfff7e9, 1.35);
+        dirLight.position.set(10, 20, 10);
+        scene.add(dirLight);
+
+        // --- UNIDAD MATERNO-PERINATAL 3D ---
+        const floorGeometry = new THREE.PlaneGeometry(120, 120, 1, 1);
+        const waterGeometry = new THREE.PlaneGeometry(120, 120, 1, 1); // se conserva el nombre para el bucle de animación
+        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0xe9dfe3, roughness: 0.92 });
+        const water = new THREE.Mesh(floorGeometry, floorMaterial);
+        water.rotation.x = -Math.PI / 2;
+        water.position.y = -0.22;
+        scene.add(water);
+        // Suelo con líneas clínicas discretas
+        const lineMat = new THREE.MeshStandardMaterial({color:0xd2bdc5, roughness:1});
+        for(let z=-30; z<24; z+=4){const line=new THREE.Mesh(new THREE.BoxGeometry(36,.015,.035),lineMat);line.position.set(0,-.19,z);scene.add(line);}
+        for(let x=-18; x<=18; x+=4){const line=new THREE.Mesh(new THREE.BoxGeometry(.035,.015,60),lineMat);line.position.set(x,-.185,-5);scene.add(line);}
+        // Pared posterior y panel superior de la unidad
+        const wallMat = new THREE.MeshStandardMaterial({color:0xfaf5f3, roughness:.9});
+        const backWall = new THREE.Mesh(new THREE.BoxGeometry(38,10,.45),wallMat); backWall.position.set(0,4.8,-15); scene.add(backWall);
+        const burgundy = new THREE.MeshStandardMaterial({color:0x762444, roughness:.55});
+        const trim = new THREE.Mesh(new THREE.BoxGeometry(38,.32,.6),burgundy); trim.position.set(0,9.2,-14.7); scene.add(trim);
+        // Letrero institucional
+        const sign = new THREE.Mesh(new THREE.BoxGeometry(8,1.45,.18),burgundy); sign.position.set(0,7.7,-14.65); scene.add(sign);
+        // Decoración geométrica dorada en el letrero
+        const goldMat = new THREE.MeshStandardMaterial({color:0xc99b52, metalness:.25, roughness:.4});
+        const signStripe = new THREE.Mesh(new THREE.BoxGeometry(6.8,.055,.22),goldMat); signStripe.position.set(0,7.22,-14.5); scene.add(signStripe);
+        const signCanvas=document.createElement('canvas'); signCanvas.width=1024; signCanvas.height=180;
+        const ctx=signCanvas.getContext('2d');ctx.fillStyle='#762444';ctx.fillRect(0,0,1024,180);ctx.fillStyle='#f6e8d3';ctx.font='bold 58px Segoe UI, Arial';ctx.textAlign='center';ctx.fillText('UNIDAD MATERNO-PERINATAL',512,78);ctx.fillStyle='#d7b16c';ctx.font='bold 30px Segoe UI, Arial';ctx.fillText('TRIAGE  ·  SALA DE PARTOS  ·  ATENCIÓN PRENATAL',512,132);
+        const signTexture=new THREE.CanvasTexture(signCanvas);const signLabel=new THREE.Mesh(new THREE.PlaneGeometry(7.7,1.35),new THREE.MeshBasicMaterial({map:signTexture,transparent:false}));signLabel.position.set(0,7.75,-14.5);scene.add(signLabel);
+        // Ventanas clínicas laterales
+        const glassMat = new THREE.MeshStandardMaterial({color:0xc3dce1, roughness:.22, metalness:.1});
+        for(const x of [-12,-7,7,12]){const win=new THREE.Mesh(new THREE.BoxGeometry(2.6,3.3,.12),glassMat);win.position.set(x,5.3,-14.67);scene.add(win);const frame=new THREE.Mesh(new THREE.BoxGeometry(2.78,3.48,.14),goldMat);frame.position.set(x,5.3,-14.75);scene.add(frame);scene.remove(win);scene.add(win);}
+        // Lámparas de techo y biombos
+        const lampMat = new THREE.MeshStandardMaterial({color:0xfff8dc, emissive:0xffe9ac, emissiveIntensity:.35});
+        for(const x of [-8,0,8]){const lamp=new THREE.Mesh(new THREE.BoxGeometry(3.1,.12,.65),lampMat);lamp.position.set(x,9.5,-3);scene.add(lamp);}
+        // Camas de exploración, monitor fetal y paneles de cabecera
+        const bedFrameMat = new THREE.MeshStandardMaterial({color:0x9eabb4, metalness:.35, roughness:.5});
+        const bedMat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:.85});
+        const blanketMat = new THREE.MeshStandardMaterial({color:0xd9a5b7, roughness:.8});
+        function addBed(x,z){
+          const base=new THREE.Mesh(new THREE.BoxGeometry(3.8,.35,1.65),bedFrameMat);base.position.set(x,.72,z);scene.add(base);
+          const mattress=new THREE.Mesh(new THREE.BoxGeometry(3.75,.28,1.6),bedMat);mattress.position.set(x,.98,z);scene.add(mattress);
+          const blanket=new THREE.Mesh(new THREE.BoxGeometry(1.7,.12,1.42),blanketMat);blanket.position.set(x+.55,1.18,z);scene.add(blanket);
+          for(const dx of [-1.55,1.55])for(const dz of [-.58,.58]){const leg=new THREE.Mesh(new THREE.CylinderGeometry(.055,.055,.7,10),bedFrameMat);leg.position.set(x+dx,.36,z+dz);scene.add(leg);}
+          const pillow=new THREE.Mesh(new THREE.BoxGeometry(.72,.15,1.15),bedMat);pillow.position.set(x-1.25,1.2,z);scene.add(pillow);
+          const pole=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,2.6,10),bedFrameMat);pole.position.set(x+2.4,1.3,z-.4);scene.add(pole);
+          const screen=new THREE.Mesh(new THREE.BoxGeometry(1.05,.75,.16),burgundy);screen.position.set(x+2.35,2.65,z-.4);scene.add(screen);
+          const screenGlow=new THREE.Mesh(new THREE.BoxGeometry(.83,.49,.04),new THREE.MeshStandardMaterial({color:0x173d43,emissive:0x1a776d,emissiveIntensity:.65}));screenGlow.position.set(x+2.35,2.65,z-.29);scene.add(screenGlow);
+          // Trazo sencillo de monitor cardiotocográfico
+          const pts=[];for(let i=0;i<18;i++){pts.push(new THREE.Vector3(x+1.98+i*.043,2.65+(i%5===2?.13:(i%5===3?-.08:0)),z-.25));}
+          const curve=new THREE.CatmullRomCurve3(pts);const trace=new THREE.Mesh(new THREE.TubeGeometry(curve,36,.012,5,false),new THREE.MeshStandardMaterial({color:0x8ce6bf,emissive:0x3cae8a,emissiveIntensity:.8}));scene.add(trace);
+        }
+        addBed(-10,-7); addBed(10,-7);
+        // Carro de atención y biombo
+        const trolley=new THREE.Mesh(new THREE.BoxGeometry(1.7,1.1,1.1),new THREE.MeshStandardMaterial({color:0xf8f6f4,roughness:.65}));trolley.position.set(-13,.7,1);scene.add(trolley);
+        const trolleyTop=new THREE.Mesh(new THREE.BoxGeometry(1.85,.12,1.2),bedFrameMat);trolleyTop.position.set(-13,1.28,1);scene.add(trolleyTop);
+        const screenPanel=new THREE.Mesh(new THREE.BoxGeometry(.12,3.5,3.6),new THREE.MeshStandardMaterial({color:0xe6d8df,transparent:true,opacity:.88}));screenPanel.position.set(13,1.75,-1);scene.add(screenPanel);
+
+        // --- PERSONAJE JUGABLE: PROFESIONAL DE OBSTETRICIA ---
+        const frogGroup = new THREE.Group();
+        const scrubMat = new THREE.MeshStandardMaterial({color:0x7d2949, roughness:.68});
+        const scrubLight = new THREE.MeshStandardMaterial({color:0xc58da2, roughness:.7});
+        const skinMat = new THREE.MeshStandardMaterial({color:0xc98769, roughness:.8});
+        const shoeMat = new THREE.MeshStandardMaterial({color:0xfaf7f4, roughness:.65});
+        const bodyGeo = new THREE.CylinderGeometry(.42,.52,1.05,16);
+        const body = new THREE.Mesh(bodyGeo,scrubMat); body.position.y=1.25; frogGroup.add(body);
+        const head = new THREE.Mesh(new THREE.SphereGeometry(.34,24,20),skinMat);head.position.set(0,2.05,0);frogGroup.add(head);
+        const hair = new THREE.Mesh(new THREE.SphereGeometry(.355,24,16,0,Math.PI*2,0,Math.PI*.58),new THREE.MeshStandardMaterial({color:0x39242b,roughness:.9}));hair.position.set(0,2.13,.02);frogGroup.add(hair);
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(.37,24,12,0,Math.PI*2,0,Math.PI*.38),shoeMat);cap.position.set(0,2.26,0);frogGroup.add(cap);
+        const cross = new THREE.Mesh(new THREE.BoxGeometry(.12,.36,.035),new THREE.MeshStandardMaterial({color:0xc79a4b}));cross.position.set(0,2.3,-.355);frogGroup.add(cross);
+        const cross2 = new THREE.Mesh(new THREE.BoxGeometry(.3,.12,.035),new THREE.MeshStandardMaterial({color:0xc79a4b}));cross2.position.set(0,2.3,-.355);frogGroup.add(cross2);
+        // Brazos, manos, pantalón y zapatos
+        for(const side of [-1,1]){
+          const arm=new THREE.Mesh(new THREE.CylinderGeometry(.13,.15,.68,10),scrubMat);arm.position.set(side*.52,1.35,0);arm.rotation.z=side*.16;frogGroup.add(arm);
+          const hand=new THREE.Mesh(new THREE.SphereGeometry(.13,12,10),skinMat);hand.position.set(side*.56,.98,-.02);frogGroup.add(hand);
+          const leg=new THREE.Mesh(new THREE.CylinderGeometry(.15,.17,.78,10),scrubLight);leg.position.set(side*.19,.47,.02);frogGroup.add(leg);
+          const shoe=new THREE.Mesh(new THREE.BoxGeometry(.38,.16,.5),shoeMat);shoe.position.set(side*.2,.12,-.12);frogGroup.add(shoe);
+        }
+        // Portapapeles visible en la mano
+        const clipboard=new THREE.Mesh(new THREE.BoxGeometry(.4,.52,.08),new THREE.MeshStandardMaterial({color:0xd6b06b,roughness:.7}));clipboard.position.set(.62,1.05,-.22);clipboard.rotation.z=-.16;frogGroup.add(clipboard);
+        const paper=new THREE.Mesh(new THREE.BoxGeometry(.3,.39,.03),shoeMat);paper.position.set(.62,1.07,-.17);paper.rotation.z=-.16;frogGroup.add(paper);
+        frogGroup.position.set(0,0,4); scene.add(frogGroup);
+
+        // --- ESTACIONES CLÍNICAS DE RESPUESTA ---
+        let lilyPads = [];
+        let currentQuestion = null;
+        let selectedLane = 1; 
+        
+        const laneSpans = {
+            2: [-4.8, 4.8],
+            3: [-7.0, 0, 7.0],
+            4: [-9.2, -3.1, 3.1, 9.2],
+            5: [-10.8, -5.4, 0, 5.4, 10.8]
+        };
+
+        function createLilyPadMesh(isGolden = false) {
+            const padGroup = new THREE.Group();
+            const padMat = new THREE.MeshStandardMaterial({color:isGolden?0xc99b52:0x7b294a,roughness:.55,metalness:isGolden?.35:.08});
+            const base = new THREE.Mesh(new THREE.BoxGeometry(4.35,.26,2.25),new THREE.MeshStandardMaterial({color:0xb6a1aa,roughness:.8}));base.position.y=.02;padGroup.add(base);
+            const top = new THREE.Mesh(new THREE.BoxGeometry(4.25,.18,2.15),padMat);top.position.y=.2;padGroup.add(top);
+            const inset = new THREE.Mesh(new THREE.BoxGeometry(3.85,.035,1.72),new THREE.MeshStandardMaterial({color:isGolden?0xf7e5b6:0xf8eef1,roughness:.7}));inset.position.y=.31;padGroup.add(inset);
+            // Mini señal clínica al frente de cada estación
+            const badge = new THREE.Mesh(new THREE.BoxGeometry(.62,.28,.08),new THREE.MeshStandardMaterial({color:isGolden?0x8b6127:0x5b1936}));badge.position.set(0,.5,.95);padGroup.add(badge);
+            return padGroup;
+        }
+
+        function setupLevel() {
+            lilyPads.forEach(p => scene.remove(p.mesh));
+            lilyPads = [];
+
+            let levelObj = levelsData[currentLevelIndex];
+            currentQuestion = levelObj.questions[currentQInLevel];
+            document.getElementById('question-text').innerText = currentQuestion.q;
+            document.getElementById('level-val').innerText = (currentLevelIndex + 1);
+
+            let numOptions = currentQuestion.options.length;
+            let positions = laneSpans[numOptions];
+
+            let indices = Array.from({length: numOptions}, (_, i) => i);
+
+            for (let i = 0; i < numOptions; i++) {
+                let isGoldenFinal = (currentLevelIndex === 5 && i === currentQuestion.correct);
+                let mesh = createLilyPadMesh(isGoldenFinal);
+                let xPos = positions[i];
+                mesh.position.set(xPos, 0, -4);
+                scene.add(mesh);
+
+                lilyPads.push({
+                    mesh: mesh,
+                    lane: i,
+                    optionIndex: indices[i],
+                    text: currentQuestion.options[indices[i]]
+                });
+            }
+            selectedLane = Math.floor(numOptions / 2);
+            targetLane = selectedLane;
+            frogGroup.position.x = positions[selectedLane];
+            createLabels(numOptions);
+            updateOptionLabels();
+        }
+
+        const labelContainer = document.createElement('div');
+        labelContainer.style.position = 'absolute';
+        labelContainer.style.top = '0';
+        labelContainer.style.left = '0';
+        labelContainer.style.width = '100%';
+        labelContainer.style.height = '100%';
+        labelContainer.style.pointerEvents = 'none';
+        document.body.appendChild(labelContainer);
+
+        let optionLabels = [];
+        function createLabels(num) {
+            optionLabels.forEach(l => l.remove());
+            optionLabels = [];
+            for (let i = 0; i < num; i++) {
+                const div = document.createElement('div');
+                div.style.position = 'absolute';
+                div.style.background = 'rgba(255, 250, 249, 0.98)';
+                div.style.padding = '10px 14px';
+                div.style.borderRadius = '14px';
+                div.style.fontWeight = 'bold';
+                div.style.color = '#5d1936';
+                div.style.boxShadow = '0 6px 18px rgba(0,0,0,0.22)';
+                div.style.border = '2.5px solid #8b2d50';
+                div.style.transform = 'translate(-50%, -50%)';
+                div.style.fontSize = '0.95rem';
+                div.style.textAlign = 'center';
+                div.style.whiteSpace = 'pre-line';
+                div.style.maxWidth = '200px';
+                labelContainer.appendChild(div);
+                optionLabels.push(div);
+            }
+        }
+
+        function updateOptionLabels() {
+            lilyPads.forEach((pad, idx) => {
+                optionLabels[idx].innerText = pad.text;
+            });
+        }
+
+        function project3DTo2D(vector, camera) {
+            let v = vector.clone();
+            v.project(camera);
+            let x = (v.x *  .5 + .5) * window.innerWidth;
+            let y = (v.y * -.5 + .5) * window.innerHeight;
+            return { x, y };
+        }
+
+        function updateLabelsPosition() {
+            lilyPads.forEach((pad, idx) => {
+                let pos3d = pad.mesh.position.clone();
+                pos3d.y += 0.35;
+                let coords = project3DTo2D(pos3d, camera);
+                optionLabels[idx].style.left = `${coords.x}px`;
+                optionLabels[idx].style.top = `${coords.y}px`;
+            });
+        }
+
+        // --- CONTROLES ---
+        let isJumping = false;
+        let jumpProgress = 0;
+        let targetLane = 1;
+
+        function moveLane(delta){
+            if(!gameActive) return;
+            const maxLane=lilyPads.length-1;
+            targetLane=Math.max(0,Math.min(maxLane,targetLane+delta));
+        }
+        function jumpNow(){ if(gameActive && !isJumping){isJumping=true;jumpProgress=0;} }
+        window.addEventListener('keydown', (e) => {
+            if (!gameActive) return;
+            let maxLane = lilyPads.length - 1;
+            if ((e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') && targetLane > 0) {
+                moveLane(-1);
+            }
+            if ((e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') && targetLane < maxLane) {
+                moveLane(1);
+            }
+            if ((e.key === 'ArrowUp' || e.key === ' ') && !isJumping) {
+                jumpNow();
+            }
+        });
+
+        // --- BUCLE DE ANIMACIÓN ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            let elapsedTime = clock.getElapsedTime();
+
+            // Ambiente hospitalario estático para mantener una escena fluida.
+
+            if (gameActive) {
+                let numOptions = lilyPads.length;
+                let currentLanes = laneSpans[numOptions];
+                if (targetLane >= currentLanes.length) targetLane = currentLanes.length - 1;
+
+                let targetX = currentLanes[targetLane];
+                frogGroup.position.x += (targetX - frogGroup.position.x) * 0.2;
+
+                if (isJumping) {
+                    jumpProgress += 0.05;
+                    frogGroup.position.y = Math.sin(jumpProgress * Math.PI) * 1.8;
+                    frogGroup.rotation.x = Math.sin(jumpProgress * Math.PI) * 0.3;
+
+                    if (jumpProgress >= 1) {
+                        isJumping = false;
+                        frogGroup.position.y = 0;
+                        frogGroup.rotation.x = 0;
+
+                        let chosenPad = lilyPads[targetLane];
+                        if (chosenPad.optionIndex === currentQuestion.correct) {
+                            score += 5;
+                            document.getElementById('score-val').innerText = score;
+
+                            currentQInLevel++;
+                            let levelObj = levelsData[currentLevelIndex];
+
+                            if (currentQInLevel >= levelObj.questions.length) {
+                                gameActive = false;
+                                optionLabels.forEach(l => l.style.display = 'none');
+                                
+                                if (currentLevelIndex >= levelsData.length - 1) {
+                                    document.getElementById('victory-score').innerText = score;
+                                    document.getElementById('victory-screen').classList.remove('hidden');
+                                } else {
+                                    document.getElementById('level-title').innerText = levelObj.name;
+                                    document.getElementById('level-msg').innerText = levelObj.msg;
+                                    document.getElementById('level-screen').classList.remove('hidden');
+                                }
+                            } else {
+                                setupLevel();
+                            }
+                        } else {
+                            lives--;
+                            updateLivesDisplay();
+                            if (lives <= 0) {
+                                gameOver();
+                            } else {
+                                targetLane = Math.floor(lilyPads.length / 2);
+                                setupLevel();
+                            }
+                        }
+                    }
+                }
+                updateLabelsPosition();
+            }
+            renderer.render(scene, camera);
+        }
+
+        function updateLivesDisplay() {
+            let heartsStr = '';
+            for (let i = 0; i < lives; i++) heartsStr += '❤️';
+            for (let i = lives; i < 3; i++) heartsStr += '🖤';
+            document.getElementById('lives-val').innerText = heartsStr;
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            score = 0;
+            lives = 3;
+            currentLevelIndex = 0;
+            currentQInLevel = 0;
+            document.getElementById('score-val').innerText = score;
+            updateLivesDisplay();
+            gameActive = true;
+            setupLevel();
+        }
+
+        function nextLevel() {
+            currentLevelIndex++;
+            currentQInLevel = 0;
+            document.getElementById('level-screen').classList.add('hidden');
+            optionLabels.forEach(l => l.style.display = 'block');
+            gameActive = true;
+            setupLevel();
+        }
+
+        function gameOver() {
+            gameActive = false;
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('gameover-screen').classList.remove('hidden');
+            optionLabels.forEach(l => l.style.display = 'none');
+        }
+
+        function restartGame() {
+            document.getElementById('gameover-screen').classList.add('hidden');
+            document.getElementById('victory-screen').classList.add('hidden');
+            optionLabels.forEach(l => l.style.display = 'block');
+            startGame();
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
